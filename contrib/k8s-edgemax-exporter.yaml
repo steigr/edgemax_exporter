@@ -1,0 +1,82 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: edgemax
+---
+kind: Secret
+apiVersion: v1
+metadata:
+  name: edgerouter-metrics
+  namespace: edgemax
+stringData:
+  address: "https://192.168.1.1"
+  insecure: "true"
+  username: "ubnt"
+  password: "ubnt"
+
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: edgerouter-metrics
+  namespace: edgemax
+  labels:
+    app: edgerouter
+spec:
+  selector:
+    matchLabels:
+      app: edgerouter
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: edgerouter
+    spec:
+      containers:
+        - name: exporter
+          image: quay.io/steigr/edgemax-exporter
+          ports:
+            - containerPort: 9132
+              name: metrics
+          args:
+            - "--edgemax.address=$(EDGEMAX_ADDRESS)"
+            - "--edgemax.insecure=$(EDGEMAX_INSECURE)"
+            - "--edgemax.username=$(EDGEMAX_USERNAME)"
+            - "--edgemax.password=$(EDGEMAX_PASSWORD)"
+          env:
+            - name: EDGEMAX_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: edgerouter-metrics
+                  key: address
+            - name: EDGEMAX_INSECURE
+              valueFrom:
+                secretKeyRef:
+                  name: edgerouter-metrics
+                  key: insecure
+            - name: EDGEMAX_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edgerouter-metrics
+                  key: username
+            - name: EDGEMAX_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edgerouter-metrics
+                  key: password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: edgerouter
+  namespace: edgemax
+  labels:
+    app: edgerouter
+spec:
+  selector:
+    app: edgerouter
+  ports:
+    - protocol: TCP
+      port: 9132
+      targetPort: metrics
+      name: metrics
